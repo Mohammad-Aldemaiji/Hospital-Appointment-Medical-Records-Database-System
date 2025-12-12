@@ -1,0 +1,238 @@
+# Data Dictionary
+
+## PERSON
+
+**Purpose:** Supertype for all people (patients + staff).
+**Primary Key:** `person_id`
+
+| Column        |         Type | Null | Key | Constraints / Notes         |
+| ------------- | -----------: | :--: | --- | --------------------------- |
+| person_id     |       BIGINT |  NO  | PK  | Surrogate key               |
+| first_name    |  VARCHAR(50) |  NO  |     |                             |
+| last_name     |  VARCHAR(50) |  NO  |     |                             |
+| date_of_birth |         DATE |  YES |     |                             |
+| gender        |  VARCHAR(20) |  YES |     | Optional (or use ENUM)      |
+| phone         |  VARCHAR(25) |  YES |     |                             |
+| email         | VARCHAR(120) |  YES |     | Recommended UNIQUE if used  |
+| address       | VARCHAR(255) |  YES |     |                             |
+| created_at    |    TIMESTAMP |  NO  |     | Default `CURRENT_TIMESTAMP` |
+
+---
+
+## PATIENT
+
+**Purpose:** Subtype of PERSON for patients.
+**Primary Key / FK:** `person_id → PERSON.person_id`
+
+| Column      |        Type | Null | Key    | Constraints / Notes          |
+| ----------- | ----------: | :--: | ------ | ---------------------------- |
+| person_id   |      BIGINT |  NO  | PK, FK | References PERSON(person_id) |
+| national_id | VARCHAR(30) |  NO  |        | UNIQUE                       |
+
+---
+
+## STAFF
+
+**Purpose:** Subtype of PERSON for employees.
+**Primary Key / FK:** `person_id → PERSON.person_id`
+
+| Column    |    Type | Null | Key    | Constraints / Notes          |
+| --------- | ------: | :--: | ------ | ---------------------------- |
+| person_id |  BIGINT |  NO  | PK, FK | References PERSON(person_id) |
+| is_active | BOOLEAN |  NO  |        | Default TRUE                 |
+| hired_at  |    DATE |  YES |        | Optional                     |
+
+---
+
+## DOCTOR
+
+**Purpose:** Subtype of STAFF for doctors.
+**Primary Key / FK:** `person_id → STAFF.person_id`
+
+| Column        |        Type | Null | Key    | Constraints / Notes                  |
+| ------------- | ----------: | :--: | ------ | ------------------------------------ |
+| person_id     |      BIGINT |  NO  | PK, FK | References STAFF(person_id)          |
+| license_no    | VARCHAR(40) |  NO  |        | UNIQUE                               |
+| department_id |      BIGINT |  NO  | FK     | References DEPARTMENT(department_id) |
+| specialty_id  |      BIGINT |  NO  | FK     | References SPECIALTY(specialty_id)   |
+
+---
+
+## RECEPTIONIST
+
+**Purpose:** Subtype of STAFF for receptionists.
+**Primary Key / FK:** `person_id → STAFF.person_id`
+
+| Column    |   Type | Null | Key    | Constraints / Notes         |
+| --------- | -----: | :--: | ------ | --------------------------- |
+| person_id | BIGINT |  NO  | PK, FK | References STAFF(person_id) |
+
+---
+
+## ADMIN
+
+**Purpose:** Subtype of STAFF for admins.
+**Primary Key / FK:** `person_id → STAFF.person_id`
+
+| Column    |   Type | Null |   Key  | Constraints / Notes         |
+| --------- | -----: | :--: | :----: | --------------------------- |
+| person_id | BIGINT |  NO  | PK, FK | References STAFF(person_id) |
+
+---
+
+## DEPARTMENT
+
+**Purpose:** Hospital departments (e.g., Cardiology).
+**Primary Key:** `department_id`
+
+| Column        |        Type | Null | Key | Constraints / Notes |
+| ------------- | ----------: | :--: | --- | ------------------- |
+| department_id |      BIGINT |  NO  | PK  |                     |
+| name          | VARCHAR(80) |  NO  |     | UNIQUE              |
+
+---
+
+## SPECIALTY
+
+**Purpose:** Specialties within a department (e.g., Pediatric Cardiology).
+**Primary Key:** `specialty_id`
+
+| Column        |        Type | Null | Key | Constraints / Notes                     |
+| ------------- | ----------: | :--: | --- | --------------------------------------- |
+| specialty_id  |      BIGINT |  NO  | PK  |                                         |
+| department_id |      BIGINT |  NO  | FK  | References DEPARTMENT(department_id)    |
+| name          | VARCHAR(80) |  NO  |     | Recommended UNIQUE(department_id, name) |
+
+---
+
+## APPOINTMENT
+
+**Purpose:** Scheduled meeting between a patient and a doctor.
+**Primary Key:** `appointment_id`
+
+**Allowed values (recommended):**
+
+* `status ∈ {Scheduled, Completed, Canceled, NoShow}`
+
+| Column         |        Type | Null | Key | Constraints / Notes                  |
+| -------------- | ----------: | :--: | --- | ------------------------------------ |
+| appointment_id |      BIGINT |  NO  | PK  |                                      |
+| patient_id     |      BIGINT |  NO  | FK  | References PATIENT(person_id)        |
+| doctor_id      |      BIGINT |  NO  | FK  | References DOCTOR(person_id)         |
+| created_at     |   TIMESTAMP |  NO  |     | Default `CURRENT_TIMESTAMP`          |
+| start_time     |   TIMESTAMP |  NO  |     |                                      |
+| end_time       |   TIMESTAMP |  YES |     | Recommended (analytics + validation) |
+| status         | VARCHAR(20) |  NO  |     | CHECK allowed values                 |
+| check_in_time  |   TIMESTAMP |  YES |     | Optional (analytics)                 |
+
+---
+
+## VISIT (Weak entity owned by APPOINTMENT)
+
+**Purpose:** Clinical encounter created from an appointment.
+**Primary Key (composite):** `(appointment_id, visit_no)`
+**FK:** `appointment_id → APPOINTMENT.appointment_id`
+
+| Column            |      Type | Null | Key    | Constraints / Notes         |
+| ----------------- | --------: | :--: | ------ | --------------------------- |
+| appointment_id    |    BIGINT |  NO  | PK, FK | Owner key                   |
+| visit_no          |       INT |  NO  | PK     | Partial key (e.g., 1,2,3…)  |
+| created_at        | TIMESTAMP |  NO  |        | Default `CURRENT_TIMESTAMP` |
+| started_at        | TIMESTAMP |  YES |        | Optional                    |
+| ended_at          | TIMESTAMP |  YES |        | Optional                    |
+| notes             |      TEXT |  YES |        |                             |
+| diagnosis_summary |      TEXT |  YES |        |                             |
+
+---
+
+## DIAGNOSIS (Weak entity owned by VISIT)
+
+**Purpose:** Diagnoses recorded during a visit.
+**Primary Key (composite):** `(appointment_id, visit_no, diagnosis_no)`
+**FK:** `(appointment_id, visit_no) → VISIT(appointment_id, visit_no)`
+
+| Column         |        Type | Null | Key    | Constraints / Notes        |
+| -------------- | ----------: | :--: | ------ | -------------------------- |
+| appointment_id |      BIGINT |  NO  | PK, FK | Identifying key from VISIT |
+| visit_no       |         INT |  NO  | PK, FK | Identifying key from VISIT |
+| diagnosis_no   |         INT |  NO  | PK     | Partial key                |
+| icd_code       | VARCHAR(15) |  YES |        | Optional ICD-10 code       |
+| description    |        TEXT |  NO  |        |                            |
+| diagnosed_at   |   TIMESTAMP |  YES |        |                            |
+
+---
+
+## LAB_ORDER (Weak entity owned by VISIT)
+
+**Purpose:** Lab tests ordered during a visit.
+**Primary Key (composite):** `(appointment_id, visit_no, lab_order_no)`
+**FK:** `(appointment_id, visit_no) → VISIT(appointment_id, visit_no)`
+
+**Allowed values (recommended):**
+
+* `status ∈ {Ordered, InProgress, Completed, Canceled}`
+
+| Column         |         Type | Null | Key    | Constraints / Notes        |
+| -------------- | -----------: | :--: | ------ | -------------------------- |
+| appointment_id |       BIGINT |  NO  | PK, FK | Identifying key from VISIT |
+| visit_no       |          INT |  NO  | PK, FK | Identifying key from VISIT |
+| lab_order_no   |          INT |  NO  | PK     | Partial key                |
+| test_name      | VARCHAR(120) |  NO  |        |                            |
+| status         |  VARCHAR(20) |  NO  |        | CHECK allowed values       |
+| ordered_at     |    TIMESTAMP |  NO  |        |                            |
+| result_date    |    TIMESTAMP |  YES |        | Nullable until complete    |
+| result_text    |         TEXT |  YES |        | Nullable until complete    |
+
+---
+
+## PRESCRIPTION (Weak entity owned by VISIT; authored by DOCTOR)
+
+**Purpose:** Prescription issued during a visit.
+**Primary Key (composite):** `(appointment_id, visit_no, rx_no)`
+**FK:** `(appointment_id, visit_no) → VISIT(appointment_id, visit_no)`
+**FK (author):** `doctor_id → DOCTOR(person_id)`
+
+| Column         |      Type | Null | Key    | Constraints / Notes         |
+| -------------- | --------: | :--: | ------ | --------------------------- |
+| appointment_id |    BIGINT |  NO  | PK, FK | Identifying key from VISIT  |
+| visit_no       |       INT |  NO  | PK, FK | Identifying key from VISIT  |
+| rx_no          |       INT |  NO  | PK     | Partial key                 |
+| doctor_id      |    BIGINT |  NO  | FK     | Prescribing doctor          |
+| created_at     | TIMESTAMP |  NO  |        | Default `CURRENT_TIMESTAMP` |
+| notes          |      TEXT |  YES |        |                             |
+
+---
+
+## MEDICATION
+
+**Purpose:** Medication catalog/master data.
+**Primary Key:** `med_id`
+
+| Column       |         Type | Null | Key | Constraints / Notes |
+| ------------ | -----------: | :--: | --- | ------------------- |
+| med_id       |       BIGINT |  NO  | PK  |                     |
+| name         | VARCHAR(120) |  NO  |     |                     |
+| form         |  VARCHAR(40) |  YES |     | tablet/syrup/etc.   |
+| strength     |  VARCHAR(40) |  YES |     | e.g., 500mg         |
+| manufacturer | VARCHAR(120) |  YES |     |                     |
+
+---
+
+## PRESCRIPTION_ITEM (Implements M:N “CONTAINS” between PRESCRIPTION and MEDICATION)
+
+**Purpose:** One row = one medication line inside a prescription; stores relationship attributes (dosage, frequency…).
+**Primary Key (composite):** `(appointment_id, visit_no, rx_no, med_id)`
+**FK:** `(appointment_id, visit_no, rx_no) → PRESCRIPTION(...)`
+**FK:** `med_id → MEDICATION(med_id)`
+
+| Column         |        Type | Null | Key    | Constraints / Notes               |
+| -------------- | ----------: | :--: | ------ | --------------------------------- |
+| appointment_id |      BIGINT |  NO  | PK, FK | From PRESCRIPTION identifying key |
+| visit_no       |         INT |  NO  | PK, FK | From PRESCRIPTION identifying key |
+| rx_no          |         INT |  NO  | PK, FK | From PRESCRIPTION identifying key |
+| med_id         |      BIGINT |  NO  | PK, FK | References MEDICATION(med_id)     |
+| dosage         | VARCHAR(60) |  NO  |        | e.g., “1 tablet”                  |
+| frequency      | VARCHAR(60) |  NO  |        | e.g., “2x/day”                    |
+| duration_days  |         INT |  YES |        |                                   |
+| instructions   |        TEXT |  YES |        |                                   |
+
